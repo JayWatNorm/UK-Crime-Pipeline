@@ -1,0 +1,29 @@
+name: uk-crime-pipeline
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "5433:5432"
+    volumes:
+      - crime_pgdata:/var/lib/postgresql/data
+      # Uncomment once ingestion/db/init.sql exists (Phase 3 — raw table DDL,
+      # schema not decided yet). Mounting a bind path that doesn't exist yet
+      # makes Docker create an empty directory there instead, which breaks
+      # the container — see Comfort Compass gotchas log.
+      # - ./ingestion/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # dbt, airflow, and other services are added in later build phases
+  # (Phase 4 and Phase 5 of the project plan) once schema/DAGs exist.
+
+volumes:
+  crime_pgdata:

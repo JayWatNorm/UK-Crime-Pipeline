@@ -1,0 +1,28 @@
+# Secrets
+.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# dbt
+target/
+logs/
+dbt_packages/
+
+# Airflow (added Phase 5)
+airflow/logs/
+airflow/airflow.db
+airflow/airflow.cfg
+airflow/webserver_config.py
+
+# Raw data downloads (large, re-downloadable from data.police.uk)
+ingestion/downloads/
+
+# Generated viz output
+viz/output/
+
+# OS / editor
+.DS_Store
+.vscode/
