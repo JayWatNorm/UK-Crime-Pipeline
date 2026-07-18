@@ -11,11 +11,7 @@ services:
       - "5433:5432"
     volumes:
       - crime_pgdata:/var/lib/postgresql/data
-      # Uncomment once ingestion/db/init.sql exists (Phase 3 — raw table DDL,
-      # schema not decided yet). Mounting a bind path that doesn't exist yet
-      # makes Docker create an empty directory there instead, which breaks
-      # the container — see Comfort Compass gotchas log.
-      # - ./ingestion/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./ingestion/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER}"]
       interval: 5s

@@ -1,25 +1,28 @@
 # Data Source Notes — data.police.uk
 
 Phase 1 deliverable (project plan §Phase 1). Findings from data.police.uk's
-own documentation and a live API sample, gathered 2026-07-18. **Not yet
-cross-checked against an actual downloaded CSV** — see caveat at the bottom.
+own documentation and a live API sample, gathered 2026-07-18, then
+cross-checked by the user against a real downloaded CSV (custom download
+page, Dyfed-Powys Police, May 2026) the same day — confirmed accurate, see
+below.
 
 ## CSV columns (street-level crime files)
 
-Per the official [About page](https://data.police.uk/about/#columns):
+**Confirmed against a real downloaded CSV** — exact header row, in order:
+`Crime ID, Month, Reported by, Falls within, Longitude, Latitude, Location,
+LSOA code, LSOA name, Crime type, Last outcome category, Context`.
 
 | Column | Notes |
 |---|---|
-| Crime ID | One-way hash of the offence reference. Can be blank for some records. |
-| Month | Truncated to `YYYY-MM` — no day-level granularity. |
-| Reported by | Force that supplied the data. |
-| Falls within | Currently always the same as "Reported by" — the docs note this is under review and may change. |
-| Longitude / Latitude | Anonymised — snapped to the nearest of ~760k pre-defined map points (street centres, parks, named premises), not the real location. Zeroed out if nearest snap point is >20km away. |
-| Location | Not explicitly named in the About page's column table, but corroborated by the live JSON API sample (`location.street.name`, e.g. "On or near Roman Street") — expect an equivalent free-text column in the CSV. **Confirm exact column name against a real file.** |
-| LSOA code / LSOA name | 2021 LSOA boundaries (ONS). |
-| Crime type | One of 14 fixed categories (see below) — confirmed live via the API. |
-| Last outcome category | Most recent outcome only, not full history. One of ~28 fixed values (see below). |
-| Context | Free text for forces to add detail. Empty for all newly added rows currently. |
+| Crime ID | One-way hash of the offence reference, e.g. `4fb2c342...843806`. Docs say it can be blank on some records — not observed in the sample checked, but no not-null/unique constraint assumed in the raw DDL because of this. |
+| Month | Truncated to `YYYY-MM` — no day-level granularity. Confirmed e.g. `2026-05`. |
+| Reported by / Falls within | Force that supplied the data. Confirmed identical on every sampled row (e.g. both `Dyfed-Powys Police`) — matches the docs' note that these are currently always the same. |
+| Longitude / Latitude | Anonymised — snapped to the nearest of ~760k pre-defined map points (street centres, parks, named premises), not the real location. Zeroed out if nearest snap point is >20km away. Confirmed real decimal values in the sample, e.g. `-1.907962, 52.493187`. |
+| Location | Confirmed present, e.g. `On or near Westhorpe Grove`, `On or near Gwent Terrace`. |
+| LSOA code / LSOA name | Confirmed, e.g. `E01033638` / `Birmingham 049F`, and `W01001468` / `Blaenau Gwent 005E` — both English (`E`) and Welsh (`W`) prefixes seen, as expected for a Welsh force. |
+| Crime type | One of 14 fixed categories (see below) — confirmed live via the API and in the sample (`Violence and sexual offences`). |
+| Last outcome category | Most recent outcome only, not full history. Confirmed in sample, e.g. `Investigation complete; no suspect identified`, `Under investigation`. |
+| Context | Free text for forces to add detail. Empty on every sampled row, consistent with the docs saying it's currently always empty for new rows. |
 
 ## Crime categories (confirmed live, 2026-04)
 
@@ -79,19 +82,26 @@ Effectively answered by the above: the bulk archive already bundles **all
 UK forces** together in one zip (one CSV per force inside it) — there's no
 smaller "subset" version at this bulk level. ~1.6GB either way.
 
-## Caveat — not yet verified against a real file
+## Postcode enrichment — considered, shelved
 
-Everything above comes from data.police.uk's live documentation pages and
-one live JSON API call, not an actual downloaded CSV — the 1.6GB archive
-isn't practical to pull through the sandboxed environment this was
-researched in (direct downloads to data.police.uk are network-blocked
-there). Before writing the ingestion script (Phase 3) or raw table DDL,
-do a real download and confirm:
+Raised after noticing rows have Longitude/Latitude but no postcode column:
+could reverse-geocode lat/long → postcode (as Comfort Compass does with
+`postcodes.io`). Shelved for now — two reasons: (1) at ~3 years/all-UK
+scale this is a genuine batch geocoding job, not a quick enrichment step,
+and (2) the published lat/long is already anonymised to the nearest of a
+fixed set of "safe" points, so a derived postcode would describe the
+anonymisation point, not necessarily where the crime happened — risks
+implying false precision the plan deliberately avoids elsewhere. LSOA
+already serves the "what area" purpose without that risk. Possible
+deferred Phase 4/6 enrichment if revisited later.
 
-- Exact column header names/order (especially whether "Location" exists
-  and what it's actually called)
-- Whether "Crime ID" is ever genuinely blank, and how that should be
-  handled (nullable? excluded from a uniqueness test?)
-- Encoding, line endings, and whether a trailing blank line/row exists
-- Whether outcome data is present per-row or needs the separate "include
-  outcomes data" option from the custom download page
+## Remaining open item
+
+Outcome data: the sample checked only used the default "include crime
+data" option from the custom download page — haven't yet checked what the
+separate "include outcomes data" checkbox adds (a full per-crime outcome
+history file, per the About page) or whether the project needs it. Current
+plan only uses `Last outcome category` from the main crime file, which is
+sufficient for the marts the plan describes (`fct_crimes`,
+`agg_crimes_by_force_month_category`, `agg_crimes_by_lsoa`) — revisit only
+if outcome-history-specific analysis gets added to scope later.
