@@ -1,5 +1,7 @@
 # UK Crime Data Pipeline
 
+[github.com/JayWatNorm/UK-Crime-Pipeline](https://github.com/JayWatNorm/UK-Crime-Pipeline)
+
 A data engineering portfolio project: ingests, models, orchestrates, and visualizes
 UK police street-level crime data at national scale.
 
@@ -13,8 +15,11 @@ that project didn't cover:
 
 ## Data source
 
-[data.police.uk](https://data.police.uk/data/) — monthly street-level crime archives
-published by police forces across England, Wales, and Northern Ireland.
+[data.police.uk](https://data.police.uk/data/) — street-level crime archives
+published by police forces across England, Wales, and Northern Ireland. Each
+archive is a rolling ~3-year snapshot rather than a single month's data — see
+`docs/data-source-notes.md` for the full schema, archive structure, and
+backfill approach.
 
 ## Stack
 
@@ -33,8 +38,13 @@ Full architecture, phased task breakdown, and design rationale live in
 
 ## Status
 
-Early scaffolding — see the companion progress tracker for where the build
-actually stands.
+- Data source schema confirmed against a real download (`docs/data-source-notes.md`)
+- Postgres + Docker foundation in place, raw table DDL (`raw_crimes`) written
+- Ingestion script in progress (download + local caching working; per-month
+  loading into Postgres not yet built)
+- dbt, Airflow, viz, and CI/CD not yet started
+
+See the companion progress tracker for full detail on where the build stands.
 
 ## Setup
 
