@@ -95,13 +95,32 @@ implying false precision the plan deliberately avoids elsewhere. LSOA
 already serves the "what area" purpose without that risk. Possible
 deferred Phase 4/6 enrichment if revisited later.
 
-## Remaining open item
+## Archive contents — confirmed three file types per force per month
 
-Outcome data: the sample checked only used the default "include crime
-data" option from the custom download page — haven't yet checked what the
-separate "include outcomes data" checkbox adds (a full per-crime outcome
-history file, per the About page) or whether the project needs it. Current
-plan only uses `Last outcome category` from the main crime file, which is
-sufficient for the marts the plan describes (`fct_crimes`,
-`agg_crimes_by_force_month_category`, `agg_crimes_by_lsoa`) — revisit only
-if outcome-history-specific analysis gets added to scope later.
+Extracted `latest.zip` and confirmed the structure: one subfolder per month
+(`2023-06/`, `2023-07/`, ... `2026-05/`), each containing three files per
+force: `-street.csv`, `-outcomes.csv`, `-stop-and-search.csv` (BTP has no
+outcomes file, matching the docs' note that BTP and PSNI don't provide
+outcome data).
+
+- **street** — the one this project uses. Matches the schema documented
+  above.
+- **stop-and-search** — a different dataset entirely (person stopped:
+  ethnicity, gender, age group, outcome — not crime records). Never in
+  scope for this project.
+- **outcomes** — checked directly against a real sample (Avon and
+  Somerset, 2023-09): columns are the same location fields as street, but
+  `Crime type`/`Last outcome category`/`Context` are replaced with a single
+  `Outcome type` column. Row counts differ (14,510 street rows vs. 5,649
+  outcomes rows for this force/month), and **the two don't cover the same
+  crimes** — of 5,195 unique Crime IDs in the outcomes file, only 2,846
+  also appear in that month's street file. This matches the About page's
+  note that an outcomes file contains status updates that *happened* that
+  month for crimes that may have originally occurred many months earlier
+  — since the archive only covers Jun 2023 onward, some outcome updates
+  reference crimes with no matching street record anywhere in the held
+  data. Confirms the earlier call: outcomes would need month-crossing joins
+  to use properly, and isn't needed since street's own
+  `Last outcome category` already covers what the planned marts
+  (`fct_crimes`, `agg_crimes_by_force_month_category`, `agg_crimes_by_lsoa`)
+  require. Left untouched by `load_month`.
