@@ -2,11 +2,14 @@
 UK Police Data API and save it to the specified path."""
 import os
 from datetime import datetime
+import shutil
 import requests
+import zipfile
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
 download_file = os.path.join(script_dir, "..", "ingestion", "downloads", "latest.zip")
 download_path = os.path.join(script_dir, "..", "ingestion", "downloads")
+zip_path = os.path.join(script_dir, "..", "ingestion", "downloads", "latest")
 
 
 def fnc_download(dlpath):
@@ -53,4 +56,20 @@ else:
     else:
         print("File download failed:", download_file)
 
-print ("end")
+print ("Download Section Complete at:", datetime.now())
+
+
+
+#Create the zip path if it does not exist, if it does exist, remove it and create a new one. Then extract the zip file to the path.
+
+
+if os.path.exists(zip_path):
+    print("Zip path exists, removing:   ", zip_path)
+    shutil.rmtree(path=zip_path)
+else:
+    print("Directory Doesnt Exist:", zip_path)
+
+os.makedirs(zip_path,exist_ok=True)
+with zipfile.ZipFile(download_file, 'r') as zip_ref:
+    zip_ref.extractall(zip_path)
+    print("Extracted zip file to:", zip_path)  
