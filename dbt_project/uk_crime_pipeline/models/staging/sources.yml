@@ -1,0 +1,15 @@
+version: 2
+
+sources:
+  - name: raw
+    schema: public
+    tables:
+      - name: raw_crimes
+      - name: raw_outcomes
+      - name: raw_stop_and_search
+
+
+  - name: crime_metadata
+    schema: public
+    tables:
+      - name: checklog
