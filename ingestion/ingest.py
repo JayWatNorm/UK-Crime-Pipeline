@@ -1,5 +1,6 @@
 """Routine to download the latest.zip file from the
 UK Police Data API and save it to the specified path."""
+from ast import If
 import os
 from datetime import datetime
 import shutil
@@ -23,6 +24,7 @@ download_file = os.path.join(script_dir, "..", "ingestion", "downloads", "latest
 download_path = os.path.join(script_dir, "..", "ingestion", "downloads")
 zip_path = os.path.join(script_dir, "..", "ingestion", "downloads", "latest")
 doZip = False
+doPGLoad = False
 
 now = datetime.now()
 months = []
@@ -138,21 +140,24 @@ def load_street_to_db(year_month, street_files, cursor):
                 for row in reader
             ]
         if rows:
-            execute_values(cursor, insert_sql, rows)
+            execute_values(cursor, insert_sql, rows, page_size=5000)
 
 
-conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
-cursor = conn.cursor()
 
-for year_month in months:
-    print("Loading data for month:", year_month)
-    y, m = map(int, year_month.split('-'))
-    files = load_month(y, m)
-    if files is None:
-        continue
-    load_street_to_db(year_month, files["street"], cursor)
-    conn.commit()
-    print(f"Committed {year_month}")
+if doPGLoad:
+    conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
+    cursor = conn.cursor()
+    for year_month in months:
+        print("Loading data for month:", year_month)
+        y, m = map(int, year_month.split('-'))
+        files = load_month(y, m)
+        if files is None:
+            continue
+        load_street_to_db(year_month, files["street"], cursor)
+        conn.commit()
+        print(f"Committed {year_month}")
 
-cursor.close()
-conn.close()
+    cursor.close()
+    conn.close()
+else:
+    print("PostgreSQL load skipped as doPGLoad is set to False.")
