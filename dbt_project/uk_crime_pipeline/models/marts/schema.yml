@@ -4,8 +4,10 @@ models:
   - name: fct_crimes
     description: One row per crime, cleaned and typed from raw_crimes.
 
-  - name: agg_crimes_by_force_month_category
-    description: Crime counts grouped by police force, month, and crime type.
+  - name: agg_crimes_by_lsoa_force_month_category
+    description: Crime counts grouped by police force, month, lsoa, lsoa code and crime type.
+  - name: agg_crimes_month_category
+    description: Crime counts grouped month, crime type.
 
-  - name: agg_crimes_by_lsoa_month_category
-    description: Crime counts grouped by LSOA.
+  - name: agg_crimes_by_lsoa_force_month_category_dist
+    description: Calculates the percent of the crimes which happen within each force, this uses falls within
