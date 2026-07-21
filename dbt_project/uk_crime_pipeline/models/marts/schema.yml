@@ -3,11 +3,13 @@ version: 2
 models:
   - name: fct_crimes
     description: One row per crime, cleaned and typed from raw_crimes.
-
+  - name: fct_stop_and_search
+    description: One row per stop and search, excluding ingest date and columns without data (policing operation). 
+  - name: fct_outcomes
+    description: One row per stop and search, excluding ingest date and columns without data (policing operation). 
   - name: agg_crimes_by_lsoa_force_month_category
     description: Crime counts grouped by police force, month, lsoa, lsoa code and crime type.
   - name: agg_crimes_month_category
     description: Crime counts grouped month, crime type.
-
   - name: agg_crimes_by_lsoa_force_month_category_dist
     description: Calculates the percent of the crimes which happen within each force, this uses falls within
