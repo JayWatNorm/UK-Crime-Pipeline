@@ -10,6 +10,7 @@ select
     longitude,
     latitude,
     gender,
+    age_range,
     self_defined_ethnicity,
     officer_defined_ethnicity,
     legislation,
