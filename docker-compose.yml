@@ -18,8 +18,66 @@ services:
       timeout: 5s
       retries: 5
 
-  # dbt, airflow, and other services are added in later build phases
-  # (Phase 4 and Phase 5 of the project plan) once schema/DAGs exist.
+  # Airflow's own metadata DB -- kept entirely separate from crime_data.
+  # Airflow stores dozens of internal tables (dag_run, task_instance, xcom,
+  # log, connection, etc.) here; mixing that into the application database
+  # would be messy, so it gets its own small Postgres instance instead.
+  # No host port exposed -- nothing outside the Compose network needs to
+  # reach this directly.
+  airflow-postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${AIRFLOW_DB_NAME}
+      POSTGRES_USER: ${AIRFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${AIRFLOW_DB_PASSWORD}
+    volumes:
+      - airflow_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${AIRFLOW_DB_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Single-container Airflow (webserver + scheduler together via the
+  # `standalone` command) using LocalExecutor -- appropriately sized for a
+  # DAG that runs a handful of sequential tasks once a month. No Celery,
+  # Redis, worker, or triggerer needed at this scale.
+  airflow:
+    image: apache/airflow:2.10.4
+    depends_on:
+      airflow-postgres:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-postgres:5432/${AIRFLOW_DB_NAME}
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      AIRFLOW_UID: "50000"
+      # Quick-setup way to get ingest.py's own dependencies into the
+      # Airflow image without a custom Dockerfile. Fine for a project at
+      # this scale; a custom image would be the production-grade upgrade.
+      _PIP_ADDITIONAL_REQUIREMENTS: "psycopg2-binary requests python-dotenv"
+      # Lets the DAG do `from ingestion.ingest import main`
+      PYTHONPATH: /opt/airflow/project
+      # App database connection -- postgres/5432 here, NOT localhost/5433.
+      # This container reaches the postgres service over the internal
+      # Docker network by service name, not through the host-mapped port
+      # your venv-run scripts use.
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - ./dags:/opt/airflow/dags
+      - ./ingestion:/opt/airflow/project/ingestion
+      - airflow_logs:/opt/airflow/logs
+    ports:
+      - "8080:8080"
+    command: standalone
 
 volumes:
   crime_pgdata:
+  airflow_pgdata:
+  airflow_logs:

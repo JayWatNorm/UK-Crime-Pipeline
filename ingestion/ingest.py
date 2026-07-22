@@ -17,36 +17,135 @@ db_port = os.getenv("DB_PORT")
 db_name = os.getenv("DB_NAME")
 db_user = os.getenv("DB_USER")
 db_password = os.getenv("DB_PASSWORD")
-
 script_dir = os.path.dirname(os.path.abspath(__file__))
 download_file = os.path.join(script_dir, "..", "ingestion", "downloads", "latest.zip")
 download_path = os.path.join(script_dir, "..", "ingestion", "downloads")
 zip_path = os.path.join(script_dir, "..", "ingestion", "downloads", "latest")
-doZip = False
-doPGLoad = False
-now = datetime.now()
-months = []
-year, month = now.year, now.month
+
+def main():
+    try:
+        response = requests.get("https://data.police.uk/api/crime-last-updated", timeout=10)
+        response.raise_for_status()
+        lastUpdated_date = response.json()['date']
+    except (requests.exceptions.RequestException, KeyError, ValueError) as e:
+        print(f"Could not check crime-last-updated: {e}")
+        sys.exit(1)
+
+    print(f"Crime last updated: {lastUpdated_date}")
+
+    doZip = False
+    doPGLoad = False
+    now = datetime.now()
+    months = []
+    year, month = now.year, now.month
+
+    conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM checklog WHERE status = 'success' ORDER BY id DESC LIMIT 1")
+    row = cursor.fetchone()
+    conn.close()
+    print(row)
+
+    if row is None or row[1].date() != datetime.strptime(lastUpdated_date, "%Y-%m-%d").date():  # if more recent file then nuke the path
+        doZip = True
+        doPGLoad = True
+        if os.path.exists(download_path):
+            shutil.rmtree(download_path)
+        download_result = fncdownload_file(lastUpdated_date)
+        if download_result != 0:
+            doZip = False
+            doPGLoad = False
+
+    if doZip:
+        for i in range(38):
+            months.append(f"{year}-{month:02d}")
+            month -= 1
+            if month == 0:
+                month = 12
+                year -= 1
+
+    if doZip:
+        try:
+            if os.path.exists(zip_path):
+                print("Zip path exists, removing:", zip_path)
+                shutil.rmtree(path=zip_path)
+            else:
+                print("Directory doesn't exist:", zip_path)
+            print("Creating zip path:", zip_path)
+            os.makedirs(zip_path, exist_ok=True)
+            with zipfile.ZipFile(download_file, 'r') as zip_ref:
+                zip_ref.extractall(zip_path)
+                print("Extracted zip file to:", zip_path)
+        except Exception as e:
+            print(f"Zip extraction failed: {e}")
+            write_checklog("failure", lastUpdated_date, f"zip extraction failed: {e}")
+            doPGLoad = False
+            doZip = False
+    else:
+        print("Zip extraction skipped as doZip is set to False.")
+
+    if doPGLoad:
+        conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
+        cursor = conn.cursor()
+        all_succeeded = True
+        errors = []
+
+        for year_month in months:
+            print("Loading data for month:", year_month)
+            y, m = map(int, year_month.split('-'))
+            files = load_month(y, m)
+            if files is None:
+                continue
+
+            try:
+                load_street_to_db(year_month, files["street"], cursor)
+                load_outcomes_to_db(year_month, files["outcomes"], cursor)
+                load_search_to_db(year_month, files["stop_and_search"], cursor)
+                conn.commit()
+                print(f"Committed {year_month}")
+            except Exception as e:
+                conn.rollback()
+                all_succeeded = False
+                errors.append(f"{year_month}: {e}")
+                print(f"Failed to load {year_month}, rolled back: {e}")
+
+        cursor.close()
+        conn.close()
+
+        status = "success" if all_succeeded else "failure"
+        error_message = "; ".join(errors) if errors else None
+        write_checklog(status, lastUpdated_date, error_message)
+
+        if all_succeeded:
+            shutil.rmtree(download_path)
+            print("All months loaded successfully — checklog recorded success, downloads cleaned up.")
+        else:
+            print("At least one month failed — checklog recorded failure, downloads kept for retry.")
+
+    else:
+        print("PostgreSQL load skipped as doPGLoad is set to False.")
+
 
 def blank_to_none(value):
     return value if value != '' else None
 
-def write_checklog(status, error_message=None):
+def write_checklog(status, last_updated, error_message=None):
     """Write one row to checklog for this run -- 'success' or 'failure',
     with an optional error_message. Used by both the zip-extraction step
     and the per-month DB load step, so every stage of the pipeline reports
-    the same way."""
+    the same way. `last_updated` is passed in explicitly rather than read
+    from a global, since lastUpdated_date now lives inside main()."""
     log_conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
     log_cursor = log_conn.cursor()
     log_cursor.execute(
         "INSERT INTO checklog (crime_last_updated, status, error_message) VALUES (%s, %s, %s)",
-        (lastUpdated_date, status, error_message)
+        (last_updated, status, error_message)
     )
     log_conn.commit()
     log_cursor.close()
     log_conn.close()
 
-def fnc_download(dlpath):
+def fnc_download(dlpath, last_updated):
     """Download the latest.zip file from the UK Police Data API."""
     response = requests.get("https://data.police.uk/data/archive/latest.zip",
                              stream=True, timeout=300)
@@ -54,7 +153,7 @@ def fnc_download(dlpath):
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
         print(f"Error downloading file: {e}")
-        write_checklog("failure", f"download failed: {e}")
+        write_checklog("failure", last_updated, f"download failed: {e}")
         return 1
 
     with open(dlpath, "wb") as f:
@@ -63,7 +162,6 @@ def fnc_download(dlpath):
     return 0
 
 def fncdownload_file(lastUpdated_date):
-    global doZip, doPGLoad
 
     if os.path.exists(download_path):
         print("Download path exists:", download_path)
@@ -77,25 +175,21 @@ def fncdownload_file(lastUpdated_date):
             print("File already downloaded today:", download_file)
         else:
             print("File exists but not downloaded today, downloading again:", download_file)
-            FN_RESULT = fnc_download(download_file)
+            FN_RESULT = fnc_download(download_file, lastUpdated_date)
             if FN_RESULT != 0:
                 print("File download failed:", download_file)
-                doZip = False
-                doPGLoad = False
-                return
+                return 1
             print("File downloaded successfully:", download_file)
     else:
         print("File does not exist, downloading:", download_file)
-        FN_RESULT = fnc_download(download_file)
+        FN_RESULT = fnc_download(download_file, lastUpdated_date)
         if FN_RESULT != 0:
             print("File download failed:", download_file)
-            doZip = False
-            doPGLoad = False
-            return
+            return 1
         print("File downloaded successfully:", download_file)
 
     print("Download section complete at:", datetime.now())
-    return
+    return 0
 
 def load_month(year, month):
     """Find the street/outcomes/stop-and-search files for a specific year and month.
@@ -198,108 +292,5 @@ def load_search_to_db(year_month, stop_and_search_files, cursor):
             ]
         if rows:
             execute_values(cursor, insert_sql, rows, page_size=5000)
-#check the last updated date on data.police.co.uk
-
-    
-try:
-    response = requests.get("https://data.police.uk/api/crime-last-updated", timeout=10)
-    response.raise_for_status()
-    lastUpdated_date = response.json()['date']
-except (requests.exceptions.RequestException, KeyError, ValueError) as e:
-    print(f"Could not check crime-last-updated: {e}")
-    sys.exit(1)
-
-print(f"Crime last updated: {lastUpdated_date}")
-
-
-conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
-cursor = conn.cursor()   
-cursor.execute("SELECT * FROM checklog WHERE status = 'success' ORDER BY id DESC LIMIT 1")
-row = cursor.fetchone()
-conn.close()
-print(row)
-
-
-if row is None or row[1].date() != datetime.strptime(lastUpdated_date, "%Y-%m-%d").date(): #if more recent file then nuke the path 
-    doZip = True
-    doPGLoad = True
-    if os.path.exists(download_path):
-        shutil.rmtree(download_path)
-    fncdownload_file(lastUpdated_date)
-    
-## test
-#if True:  # TEMP: force a run for testing, restore the real condition after
-#    doZip = True
-#    doPGLoad = True
-
-if doZip:
-    for i in range(38):
-        months.append(f"{year}-{month:02d}")
-        month -= 1
-        if month == 0:
-            month = 12
-            year -= 1
-
-##Test 
-#months = months[:5]  # TEMP: testing only          
-
-if doZip:
-    try:
-        if os.path.exists(zip_path):
-            print("Zip path exists, removing:", zip_path)
-            shutil.rmtree(path=zip_path)
-        else:
-            print("Directory doesn't exist:", zip_path)
-        print("Creating zip path:", zip_path)
-        os.makedirs(zip_path, exist_ok=True)
-        with zipfile.ZipFile(download_file, 'r') as zip_ref:
-            zip_ref.extractall(zip_path)
-            print("Extracted zip file to:", zip_path)
-    except Exception as e:
-        print(f"Zip extraction failed: {e}")
-        write_checklog("failure", f"zip extraction failed: {e}")
-        doPGLoad = False
-        doZip = False
-else:
-    print("Zip extraction skipped as doZip is set to False.")
-
-if doPGLoad:
-    conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
-    cursor = conn.cursor()
-    all_succeeded = True
-    errors = []
-
-    for year_month in months:
-        print("Loading data for month:", year_month)
-        y, m = map(int, year_month.split('-'))
-        files = load_month(y, m)
-        if files is None:
-            continue
-
-        try:
-            load_street_to_db(year_month, files["street"], cursor)
-            load_outcomes_to_db(year_month, files["outcomes"], cursor)
-            load_search_to_db(year_month, files["stop_and_search"], cursor)
-            conn.commit()
-            print(f"Committed {year_month}")
-        except Exception as e:
-            conn.rollback()
-            all_succeeded = False
-            errors.append(f"{year_month}: {e}")
-            print(f"Failed to load {year_month}, rolled back: {e}")
-
-    cursor.close()
-    conn.close()
-
-    status = "success" if all_succeeded else "failure"
-    error_message = "; ".join(errors) if errors else None
-    write_checklog(status, error_message)
-
-    if all_succeeded:
-        shutil.rmtree(download_path)
-        print("All months loaded successfully — checklog recorded success, downloads cleaned up.")
-    else:
-        print("At least one month failed — checklog recorded failure, downloads kept for retry.")
-
-else:
-    print("PostgreSQL load skipped as doPGLoad is set to False.")
+if __name__ == "__main__":
+    main()

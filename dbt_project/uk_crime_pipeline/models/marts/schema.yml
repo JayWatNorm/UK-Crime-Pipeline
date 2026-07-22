@@ -2,14 +2,82 @@ version: 2
 
 models:
   - name: fct_crimes
+    columns:
+      - name: id
+        tests:
+          - unique
+          - not_null
+
     description: One row per crime, cleaned and typed from raw_crimes.
   - name: fct_stop_and_search
     description: One row per stop and search, excluding ingest date and columns without data (policing operation). 
   - name: fct_outcomes
-    description: One row per stop and search, excluding ingest date and columns without data (policing operation). 
+    description: One row per outcome change. 
+
   - name: agg_crimes_by_lsoa_force_month_category
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - month
+            - falls_within
+            - lsoa_code
+            - crime_type
+
+    columns: 
+      - name: crime_type
+        tests:
+        - not_null
+        - accepted_values:
+            values:
+              - 'Violence and sexual offences'
+              - 'Other theft'
+              - 'Public order'
+              - 'Other crime'
+              - 'Robbery'
+              - 'Shoplifting'
+              - 'Bicycle theft'
+              - 'Burglary'
+              - 'Criminal damage and arson'
+              - 'Anti-social behaviour'
+              - 'Theft from the person'
+              - 'Drugs'
+              - 'Vehicle crime'
+              - 'Possession of weapons'
+      - name: month
+        tests:
+        - not_null
     description: Crime counts grouped by police force, month, lsoa, lsoa code and crime type.
-  - name: agg_crimes_month_category
+  - name: agg_crimes_by_month_category
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - month
+            - crime_type
+
+    columns: 
+      - name: crime_type
+        tests:
+        - not_null
+        - accepted_values:
+            values:
+              - 'Violence and sexual offences'
+              - 'Other theft'
+              - 'Public order'
+              - 'Other crime'
+              - 'Robbery'
+              - 'Shoplifting'
+              - 'Bicycle theft'
+              - 'Burglary'
+              - 'Criminal damage and arson'
+              - 'Anti-social behaviour'
+              - 'Theft from the person'
+              - 'Drugs'
+              - 'Vehicle crime'
+              - 'Possession of weapons'
+      - name: month
+        tests:
+        - not_null
     description: Crime counts grouped month, crime type.
+
   - name: agg_crimes_by_lsoa_force_month_category_dist
     description: Calculates the percent of the crimes which happen within each force, this uses falls within
