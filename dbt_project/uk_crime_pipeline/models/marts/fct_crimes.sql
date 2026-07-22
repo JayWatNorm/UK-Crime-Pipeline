@@ -1,6 +1,7 @@
 {{ config(materialized='table') }}
 
 select
+    id, 
     crime_id,
     month,
     reported_by,
