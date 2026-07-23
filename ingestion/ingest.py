@@ -18,9 +18,16 @@ db_name = os.getenv("DB_NAME")
 db_user = os.getenv("DB_USER")
 db_password = os.getenv("DB_PASSWORD")
 script_dir = os.path.dirname(os.path.abspath(__file__))
-download_file = os.path.join(script_dir, "..", "ingestion", "downloads", "latest.zip")
-download_path = os.path.join(script_dir, "..", "ingestion", "downloads")
-zip_path = os.path.join(script_dir, "..", "ingestion", "downloads", "latest")
+# Defaults to a folder alongside this script, same as always -- but
+# overridable via DOWNLOAD_DIR. Needed when this script runs as a
+# different user than whoever owns the mounted source tree (e.g. the
+# shared homelab Airflow container), since writing into -- and deleting
+# from -- the source directory itself then fails with a permissions
+# error (rmtree/makedirs need write access to the *parent* directory,
+# not just the target one).
+download_path = os.getenv("DOWNLOAD_DIR", os.path.join(script_dir, "..", "ingestion", "downloads"))
+download_file = os.path.join(download_path, "latest.zip")
+zip_path = os.path.join(download_path, "latest")
 
 def main():
     try:
