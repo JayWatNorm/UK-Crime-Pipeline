@@ -22,7 +22,7 @@ models:
             - falls_within
             - lsoa_code
             - crime_type
-
+            - lsoa_name
     columns: 
       - name: crime_type
         tests:
