@@ -1,15 +1,17 @@
 """Routine to download the latest.zip file from the
 UK Police Data API and save it to the specified path."""
-import os
-import sys
-from datetime import datetime
-import shutil
-import psycopg2
-from psycopg2.extras import execute_values
-import requests
-import zipfile
 import csv
+import os
+import shutil
+import sys
+import zipfile
+from datetime import datetime, timezone
+
+import psycopg2
+import requests
 from dotenv import load_dotenv
+from psycopg2.extras import execute_values
+
 load_dotenv()
 
 db_host = os.getenv("DB_HOST")
@@ -42,7 +44,7 @@ def main():
 
     doZip = False
     doPGLoad = False
-    now = datetime.now()
+    now = datetime.now(tz=timezone.utc)
     months = []
     year, month = now.year, now.month
 
@@ -53,7 +55,7 @@ def main():
     conn.close()
     print(row)
 
-    if row is None or row[1].date() != datetime.strptime(lastUpdated_date, "%Y-%m-%d").date():  # if more recent file then nuke the path
+    if row is None or row[1].date() != datetime.strptime(lastUpdated_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).date():  # if more recent file then nuke the path
         doZip = True
         doPGLoad = True
         if os.path.exists(download_path):
@@ -83,7 +85,9 @@ def main():
             with zipfile.ZipFile(download_file, 'r') as zip_ref:
                 zip_ref.extractall(zip_path)
                 print("Extracted zip file to:", zip_path)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001 -- deliberately broad: any failure here must
+            # still get logged to checklog and leave doPGLoad/doZip False for a clean retry,
+            # rather than crashing past that bookkeeping.
             print(f"Zip extraction failed: {e}")
             write_checklog("failure", lastUpdated_date, f"zip extraction failed: {e}")
             doPGLoad = False
@@ -110,7 +114,9 @@ def main():
                 load_search_to_db(year_month, files["stop_and_search"], cursor)
                 conn.commit()
                 print(f"Committed {year_month}")
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 -- deliberately broad: any failure loading
+                # this month must trigger a rollback and get collected into errors, rather
+                # than crashing and skipping rollback/logging for the rest of the months.
                 conn.rollback()
                 all_succeeded = False
                 errors.append(f"{year_month}: {e}")
@@ -164,8 +170,7 @@ def fnc_download(dlpath, last_updated):
         return 1
 
     with open(dlpath, "wb") as f:
-        for chunk in response.iter_content(chunk_size=8192):
-            f.write(chunk)
+        f.writelines(response.iter_content(chunk_size=8192))
     return 0
 
 def fncdownload_file(lastUpdated_date):
@@ -178,7 +183,7 @@ def fncdownload_file(lastUpdated_date):
 
     if os.path.exists(download_file):
         print("Download file exists:", download_file)
-        if datetime.fromtimestamp(os.stat(download_file).st_mtime).date() == datetime.now().date():
+        if datetime.fromtimestamp(os.stat(download_file).st_mtime, tz=timezone.utc).date() == datetime.now(tz=timezone.utc).date():
             print("File already downloaded today:", download_file)
         else:
             print("File exists but not downloaded today, downloading again:", download_file)
@@ -195,7 +200,7 @@ def fncdownload_file(lastUpdated_date):
             return 1
         print("File downloaded successfully:", download_file)
 
-    print("Download section complete at:", datetime.now())
+    print("Download section complete at:", datetime.now(tz=timezone.utc))
     return 0
 
 def load_month(year, month):
