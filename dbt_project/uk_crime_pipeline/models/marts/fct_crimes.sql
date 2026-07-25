@@ -1,7 +1,7 @@
 {{ config(materialized='table') }}
 
 select
-    id, 
+    id,
     crime_id,
     month,
     reported_by,

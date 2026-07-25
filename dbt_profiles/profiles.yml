@@ -1,7 +1,19 @@
+# Single env_var()-driven target. Which database this points at is decided
+# entirely by the DB_* values in the environment, not by picking a target:
+#
+#   - Local dev machine  -> .env holds the homelab postgres-dev values
+#   - Standalone clone   -> .env (copied from .env.example) holds localhost
+#                           values for the repo's own bundled Postgres
+#   - Deployed homelab   -> homelab-platform sets its own values and uses
+#                           its own separate profiles.yml entirely
+#
+# Nothing is hardcoded here and there are no fallback defaults on purpose:
+# a missing variable should fail loudly rather than silently connecting to
+# somewhere unintended.
 uk_crime_pipeline:
-  target: prod
+  target: default
   outputs:
-    prod:
+    default:
       type: postgres
       host: "{{ env_var('DB_HOST') }}"
       port: "{{ env_var('DB_PORT') | as_number }}"

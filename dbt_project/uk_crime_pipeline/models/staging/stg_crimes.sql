@@ -1,5 +1,5 @@
 select
-    id, 
+    id,
     crime_id,
     (month || '-01')::date as month,
     reported_by,

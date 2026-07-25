@@ -57,10 +57,9 @@ services:
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${AIRFLOW_DB_USER}:${AIRFLOW_DB_PASSWORD}@airflow-postgres:5432/${AIRFLOW_DB_NAME}
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW_UID: "50000"
-      # Quick-setup way to get ingest.py's own dependencies into the
-      # Airflow image without a custom Dockerfile. Fine for a project at
-      # this scale; a custom image would be the production-grade upgrade.
-      # Lets the DAG do `from ingestion.ingest import main`
+      # Lets the DAG do `from ingestion.ingest import main`. Safe as a
+      # global here (unlike on the shared homelab Airflow) since this
+      # stack only ever runs this one project.
       PYTHONPATH: /opt/airflow/project
       # App database connection -- postgres/5432 here, NOT localhost/5433.
       # This container reaches the postgres service over the internal

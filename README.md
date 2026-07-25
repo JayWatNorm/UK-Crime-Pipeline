@@ -39,10 +39,15 @@ Full architecture, phased task breakdown, and design rationale live in
 ## Status
 
 - Data source schema confirmed against a real download (`docs/data-source-notes.md`)
-- Postgres + Docker foundation in place, raw table DDL (`raw_crimes`) written
-- Ingestion script in progress (download + local caching working; per-month
-  loading into Postgres not yet built)
-- dbt, Airflow, viz, and CI/CD not yet started
+- Postgres + Docker foundation in place, raw table DDL written for all three
+  source datasets (`raw_crimes`, `raw_outcomes`, `raw_stop_and_search`)
+- Ingestion complete — full ~3-year backfill across all three datasets, with
+  idempotent per-month loads, atomic rollback, and status tracking in `checklog`
+- dbt transformation layer complete — staging models for all three sources,
+  fact and aggregate marts, grain/not-null/accepted-values tests passing
+- Airflow orchestration complete — `run_ingest` → `run_dbt_build`, running
+  monthly
+- Visualization and CI/CD not yet started
 
 See the companion progress tracker for full detail on where the build stands.
 
@@ -50,11 +55,26 @@ See the companion progress tracker for full detail on where the build stands.
 
 ```bash
 cp .env.example .env   # fill in DB credentials
-docker compose up -d   # brings up Postgres
+docker compose up -d   # brings up Postgres + Airflow
 ```
 
-More services (dbt, Airflow) are added as later build phases land — see the
-project plan's phased breakdown.
+`.env` is the single source of truth for database connection details — both
+`ingestion/ingest.py` and dbt read from it, so pointing it at a different
+database is all that's needed to switch environments.
+
+### Running dbt locally
+
+dbt doesn't read `.env` files itself, so `run-dbt.ps1` loads it first and
+passes through whatever arguments you give it:
+
+```powershell
+.\run-dbt.ps1 build
+.\run-dbt.ps1 test
+```
+
+This is only needed for bare local runs. Inside Docker (and on the deployed
+Airflow instance), connection details are set directly on the container, so
+dbt is invoked normally there.
 
 ## Note
 

@@ -2,19 +2,27 @@ version: 2
 
 models:
   - name: fct_crimes
+    description: One row per crime, cleaned and typed from raw_crimes.
     columns:
       - name: id
         tests:
           - unique
           - not_null
 
-    description: One row per crime, cleaned and typed from raw_crimes.
   - name: fct_stop_and_search
-    description: One row per stop and search, excluding ingest date and columns without data (policing operation). 
+    description: >
+      One row per stop and search, excluding ingest date and columns
+      without data (policing operation).
+
   - name: fct_outcomes
-    description: One row per outcome change. 
+    description: One row per outcome change.
 
   - name: agg_crimes_by_lsoa_force_month_category
+    description: >
+      Crime counts grouped by month, force (falls_within), LSOA and crime
+      type. Note reported_by is deliberately excluded -- a crime can be
+      reported by a different force than the one it falls within, which
+      fragmented the intended grain.
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
@@ -23,61 +31,73 @@ models:
             - lsoa_code
             - crime_type
             - lsoa_name
-    columns: 
+    columns:
       - name: crime_type
         tests:
-        - not_null
-        - accepted_values:
-            values:
-              - 'Violence and sexual offences'
-              - 'Other theft'
-              - 'Public order'
-              - 'Other crime'
-              - 'Robbery'
-              - 'Shoplifting'
-              - 'Bicycle theft'
-              - 'Burglary'
-              - 'Criminal damage and arson'
-              - 'Anti-social behaviour'
-              - 'Theft from the person'
-              - 'Drugs'
-              - 'Vehicle crime'
-              - 'Possession of weapons'
+          - not_null
+          - accepted_values:
+              values: &crime_types
+                - 'Violence and sexual offences'
+                - 'Other theft'
+                - 'Public order'
+                - 'Other crime'
+                - 'Robbery'
+                - 'Shoplifting'
+                - 'Bicycle theft'
+                - 'Burglary'
+                - 'Criminal damage and arson'
+                - 'Anti-social behaviour'
+                - 'Theft from the person'
+                - 'Drugs'
+                - 'Vehicle crime'
+                - 'Possession of weapons'
       - name: month
         tests:
-        - not_null
-    description: Crime counts grouped by police force, month, lsoa, lsoa code and crime type.
+          - not_null
+
   - name: agg_crimes_by_month_category
+    description: >
+      National rollup: crime counts by month and crime type. Built on top
+      of agg_crimes_by_lsoa_force_month_category rather than re-scanning
+      fct_crimes.
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
             - month
             - crime_type
-
-    columns: 
+    columns:
       - name: crime_type
         tests:
-        - not_null
-        - accepted_values:
-            values:
-              - 'Violence and sexual offences'
-              - 'Other theft'
-              - 'Public order'
-              - 'Other crime'
-              - 'Robbery'
-              - 'Shoplifting'
-              - 'Bicycle theft'
-              - 'Burglary'
-              - 'Criminal damage and arson'
-              - 'Anti-social behaviour'
-              - 'Theft from the person'
-              - 'Drugs'
-              - 'Vehicle crime'
-              - 'Possession of weapons'
+          - not_null
+          - accepted_values:
+              values: *crime_types
       - name: month
         tests:
-        - not_null
-    description: Crime counts grouped month, crime type.
+          - not_null
 
   - name: agg_crimes_by_lsoa_force_month_category_dist
-    description: Calculates the percent of the crimes which happen within each force, this uses falls within
+    description: >
+      Each force's share of the national crime total, using falls_within.
+      Collapses LSOA grain in a CTE before joining to the national rollup
+      to avoid join fan-out.
+
+  - name: agg_crimes_by_lsoa_latlong_month
+    description: >
+      One row per LSOA per month with a crime count and a representative
+      coordinate (mean of that group's points, rounded to 4dp ~= 11m).
+      Feeds the hotspot map -- aggregating here keeps the viz layer to a
+      few thousand plottable points rather than 17M+ individual crimes.
+      Coordinates are null only when every crime in the group had blank
+      coordinates, so the viz layer must skip null rows.
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - lsoa_code
+            - month
+    columns:
+      - name: lsoa_code
+        tests:
+          - not_null
+      - name: month
+        tests:
+          - not_null
