@@ -95,9 +95,21 @@ models:
             - lsoa_code
             - month
     columns:
-      - name: lsoa_code
-        tests:
-          - not_null
       - name: month
         tests:
           - not_null
+
+  - name: agg_crimes_by_lsoa_monthly_vs_prior_year
+    description: >
+      One row per LSOA per month for each month this year, compares the crimes in said lsoa vs prior year with value and percent change.
+      low crime dense areas are likley to show extreme percentages, these are to be filtered out in the visualisation. Excludes Null lsoa codes. 
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - lsoa_code
+            - month
+    columns:
+      - name: month
+        tests:
+          - not_null
+
