@@ -82,6 +82,49 @@ Effectively answered by the above: the bulk archive already bundles **all
 UK forces** together in one zip (one CSV per force inside it) — there's no
 smaller "subset" version at this bulk level. ~1.6GB either way.
 
+## LSOA coverage — Northern Ireland is structurally absent
+
+**Confirmed against the loaded data, 2026-07-25.** ~682,000 crimes in the
+archive have no `lsoa_code`. This is two genuinely different things sharing
+one symptom, and they should not be treated the same way:
+
+**1. Northern Ireland (PSNI) — 420,653 crimes, structural.** Verified that
+PSNI's total record count and its null-LSOA count are *identical*, i.e.
+100% of PSNI records have no LSOA code. LSOAs (Lower Layer Super Output
+Areas) are an England-and-Wales geography; Northern Ireland uses its own
+Super Output Area system with different identifiers, so PSNI data can never
+carry one. Nothing is broken.
+
+The consequence matters more than the cause: **any LSOA-based model or map
+silently excludes Northern Ireland entirely.** Anything built on
+`lsoa_code` covers England and Wales only, and should say so explicitly
+rather than leaving an unexplained blank area.
+
+**2. England and Wales — ~261,000 crimes, genuinely missing.** Spread
+across most forces, led by Avon and Somerset (42,246) and South Yorkshire
+(24,509). British Transport Police appearing (2,498) is intuitive, since
+crimes on moving trains have inherently ambiguous locations; the larger
+force-level counts look more like recording practice than anything
+inherent to the offences.
+
+### Related: coordinates are always present
+
+Checked all 1,205,043 rows of `agg_crimes_by_lsoa_latlong_month` — there
+are **zero** null longitude/latitude values, including on the null-LSOA
+rows. An earlier working assumption that missing coordinates and missing
+LSOA codes came from the same records is wrong: crimes without an LSOA code
+still have valid (anonymised) coordinates. Northern Ireland crimes are
+therefore mappable as points, just not as LSOA areas.
+
+### Consequence for the marts
+
+`fct_crimes` deliberately keeps every row, including null-LSOA ones — it's
+the faithful base fact. Filtering happens in the LSOA-based marts that
+actually require the geography (`agg_crimes_by_lsoa_monthly_vs_prior_year`
+filters `lsoa_code IS NOT NULL`). Filtering at the fact layer would remove
+Northern Ireland from every downstream model — including national totals
+and trend lines — without any of their names or descriptions admitting it.
+
 ## Postcode enrichment — considered, shelved
 
 Raised after noticing rows have Longitude/Latitude but no postcode column:

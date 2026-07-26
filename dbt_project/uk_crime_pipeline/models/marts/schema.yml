@@ -87,8 +87,10 @@ models:
       coordinate (mean of that group's points, rounded to 4dp ~= 11m).
       Feeds the hotspot map -- aggregating here keeps the viz layer to a
       few thousand plottable points rather than 17M+ individual crimes.
-      Coordinates are null only when every crime in the group had blank
-      coordinates, so the viz layer must skip null rows.
+      Keeps null-lsoa_code rows (unlike the marts downstream) so the
+      report can quantify what the LSOA-based map excludes -- see
+      docs/data-source-notes.md. Verified 2026-07-25: no row has null
+      coordinates, including the null-LSOA ones.
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
@@ -102,7 +104,14 @@ models:
   - name: agg_crimes_by_lsoa_monthly_vs_prior_year
     description: >
       One row per LSOA per month for each month this year, compares the crimes in said lsoa vs prior year with value and percent change.
-      low crime dense areas are likley to show extreme percentages, these are to be filtered out in the visualisation. Excludes Null lsoa codes. 
+      low crime dense areas are likley to show extreme percentages, these are to be filtered out in the visualisation.
+      Excludes null lsoa codes -- note this means ENGLAND AND WALES ONLY.
+      LSOAs are an England-and-Wales geography, so 100% of Police Service
+      of Northern Ireland records (420,653 crimes) have no LSOA code and
+      are structurally absent from this model, along with ~261,000 England
+      and Wales crimes where the code is genuinely missing. Any report
+      built on this must say it excludes Northern Ireland rather than
+      leaving an unexplained gap. See docs/data-source-notes.md.
     tests:
       - dbt_utils.unique_combination_of_columns:
           combination_of_columns:
@@ -113,3 +122,22 @@ models:
         tests:
           - not_null
 
+  - name: agg_crimes_by_lsoa_ytd_vs_prior_year
+    description: >
+      One row per LSOA YTD this year until the latest record, the same months
+      and the values of crimes within the LSOA codes are compared giving percent
+      changes vs the prior year
+    tests:
+      - dbt_utils.unique_combination_of_columns:
+          combination_of_columns:
+            - lsoa_code
+    columns:
+      - name: losa_code
+        tests:
+          - not_null
+      - name: longitude
+        tests:
+          - not_null
+      - name: latitude
+        tests:
+          - not_null
