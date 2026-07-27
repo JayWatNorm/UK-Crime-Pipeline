@@ -47,7 +47,11 @@ Full architecture, phased task breakdown, and design rationale live in
   fact and aggregate marts, grain/not-null/accepted-values tests passing
 - Airflow orchestration complete — `run_ingest` → `run_dbt_build`, running
   monthly
-- Visualization and CI/CD not yet started
+- Visualization in progress — map-feeding marts built (year-over-year change
+  by neighbourhood, with the coordinates and comparison period the report
+  needs), plus the Plotly/Jinja2 report builder that renders them to a static
+  HTML page
+- CI/CD not yet started
 
 See the companion progress tracker for full detail on where the build stands.
 
