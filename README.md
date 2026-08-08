@@ -11,7 +11,6 @@ that project didn't cover:
 - **Orchestration** — real DAG-based scheduling with retries and historical backfill (Airflow)
 - **Scale** — a genuinely large, multi-year national dataset (~19M+ rows)
 - **Visualization** — a polished but intentionally lightweight output layer
-- **CI/CD** — automated testing on every code change (GitHub Actions) — *planned, not yet built*
 
 ## Dashboards
 
