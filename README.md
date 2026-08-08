@@ -2,6 +2,11 @@
 
 [github.com/JayWatNorm/UK-Crime-Pipeline](https://github.com/JayWatNorm/UK-Crime-Pipeline)
 
+Python by hand using ai as a Python tutor and advisor around architecture, 
+since this project i have passed my PCEP and I am currently working on dbt certification. 
+
+
+
 A data engineering portfolio project: ingests, models, orchestrates, and visualizes
 UK police street-level crime data at national scale.
 
