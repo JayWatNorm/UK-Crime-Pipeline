@@ -13,6 +13,28 @@ that project didn't cover:
 - **Scale** — a genuinely large, multi-year national dataset (~19M+ rows)
 - **Visualization** — a polished but intentionally lightweight output layer
 
+## Dashboards
+
+Power BI reports built directly on the dbt marts, using a colour-blind-safe
+palette throughout.
+
+**Stop and search** — cumulative searches year on year, outcomes broken down by
+the legislation the search was conducted under, and the distribution of searches
+across the day.
+
+![Stop and search dashboard: cumulative year-on-year searches with prior-year comparison cards, a matrix of search outcomes by legislation, and a histogram of searches by time of day](docs/Stop_And_Search.png)
+
+**Crime by police force area** — leading crime types by month, the all-time
+category breakdown, and total recorded crime over time with a trend line and
+forecast band.
+
+![Crime by region dashboard: leading crime types by month, all-time top five categories, total crime trend with forecast, and a year-to-date comparison card](docs/Crime_By_Region.png)
+
+Figures describe **recorded** crime and searches. Recording practices vary
+between forces and over time, so changes shown here do not necessarily reflect
+changes in underlying offences. See `docs/data-source-notes.md` for coverage
+limitations, including the absence of LSOA geography in Northern Ireland.
+
 ## Data source
 
 [data.police.uk](https://data.police.uk/data/) — street-level crime archives
