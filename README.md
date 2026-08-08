@@ -9,9 +9,9 @@ Follow-up to [Comfort Compass](../Comfort-Compass), deliberately targeting the g
 that project didn't cover:
 
 - **Orchestration** — real DAG-based scheduling with retries and historical backfill (Airflow)
-- **CI/CD** — automated testing on every code change (GitHub Actions)
 - **Scale** — a genuinely large, multi-year national dataset (~19M+ rows)
 - **Visualization** — a polished but intentionally lightweight output layer
+- **CI/CD** — automated testing on every code change (GitHub Actions) — *planned, not yet built*
 
 ## Dashboards
 
@@ -45,15 +45,15 @@ backfill approach.
 
 ## Stack
 
-| Layer | Choice |
-|---|---|
-| Storage | PostgreSQL (Docker) |
-| Ingestion | Python |
-| Orchestration | Apache Airflow (Docker) |
-| Transformation | dbt |
-| CI/CD | GitHub Actions |
-| Visualization | Plotly + Jinja2 → static HTML |
-| Containerization | Docker Compose |
+| Layer | Choice | Status |
+|---|---|---|
+| Storage | PostgreSQL (Docker) | Built |
+| Ingestion | Python | Built |
+| Orchestration | Apache Airflow (Docker) | Built |
+| Transformation | dbt | Built |
+| Visualization | Power BI (dashboards) · Plotly + Jinja2 → static HTML | Dashboards built, static report in progress |
+| Containerization | Docker Compose | Built |
+| CI/CD | GitHub Actions | **Planned — not yet built** |
 
 Full architecture, phased task breakdown, and design rationale live in
 `uk-crime-pipeline-project-plan.md` (project planning doc, kept outside this repo).
