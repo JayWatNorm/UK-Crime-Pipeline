@@ -57,25 +57,10 @@ backfill approach.
 | Transformation | dbt | Built |
 | Visualization | Power BI (dashboards) · Plotly + Jinja2 → static HTML | Dashboards built, static report in progress |
 | Containerization | Docker Compose | Built |
-| CI/CD | GitHub Actions | **Planned — not yet built** |
 
 Full architecture, phased task breakdown, and design rationale live in
 `uk-crime-pipeline-project-plan.md` (project planning doc, kept outside this repo).
 
-## Status
-
-- Data source schema confirmed against a real download (`docs/data-source-notes.md`)
-- Postgres + Docker foundation in place, raw table DDL written for all three
-  source datasets (`raw_crimes`, `raw_outcomes`, `raw_stop_and_search`)
-- Ingestion complete — full ~3-year backfill across all three datasets, with
-  idempotent per-month loads, atomic rollback, and status tracking in `checklog`
-- dbt transformation layer complete — staging models for all three sources,
-  fact and aggregate marts, grain/not-null/accepted-values tests passing
-- Airflow orchestration complete — `run_ingest` → `run_dbt_build`, running
-  monthly
-- Vis screenshots attached from PowerBi
-
-See the companion progress tracker for full detail on where the build stands.
 
 ## Setup
 
