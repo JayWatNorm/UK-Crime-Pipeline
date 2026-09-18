@@ -15,6 +15,7 @@ def crime_pipeline_dag():
     @task
     def run_ingest():
         from ingestion.ingest import main
+
         main()
 
     @task

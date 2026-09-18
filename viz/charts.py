@@ -5,6 +5,7 @@ access here on purpose -- keeping the charts free of I/O means they can be
 tested with a handful of hand-made rows, and build_report.py stays the only
 place that knows about connections.
 """
+
 import plotly.express as px
 
 # Pinning the colour range stops a handful of extreme areas dominating the

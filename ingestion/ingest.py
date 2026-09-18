@@ -1,5 +1,6 @@
 """Routine to download the latest.zip file from the
 UK Police Data API and save it to the specified path."""
+
 import csv
 import os
 import shutil
@@ -27,15 +28,20 @@ script_dir = os.path.dirname(os.path.abspath(__file__))
 # from -- the source directory itself then fails with a permissions
 # error (rmtree/makedirs need write access to the *parent* directory,
 # not just the target one).
-download_path = os.getenv("DOWNLOAD_DIR", os.path.join(script_dir, "..", "ingestion", "downloads"))
+download_path = os.getenv(
+    "DOWNLOAD_DIR", os.path.join(script_dir, "..", "ingestion", "downloads")
+)
 download_file = os.path.join(download_path, "latest.zip")
 zip_path = os.path.join(download_path, "latest")
 
+
 def main():
     try:
-        response = requests.get("https://data.police.uk/api/crime-last-updated", timeout=10)
+        response = requests.get(
+            "https://data.police.uk/api/crime-last-updated", timeout=10
+        )
         response.raise_for_status()
-        lastUpdated_date = response.json()['date']
+        lastUpdated_date = response.json()["date"]
     except (requests.exceptions.RequestException, KeyError, ValueError) as e:
         print(f"Could not check crime-last-updated: {e}")
         sys.exit(1)
@@ -48,14 +54,24 @@ def main():
     months = []
     year, month = now.year, now.month
 
-    conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
+    conn = psycopg2.connect(
+        host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password
+    )
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM checklog WHERE status = 'success' ORDER BY id DESC LIMIT 1")
+    cursor.execute(
+        "SELECT * FROM checklog WHERE status = 'success' ORDER BY id DESC LIMIT 1"
+    )
     row = cursor.fetchone()
     conn.close()
     print(row)
 
-    if row is None or row[1].date() != datetime.strptime(lastUpdated_date, "%Y-%m-%d").replace(tzinfo=timezone.utc).date():  # if more recent file then nuke the path
+    if (
+        row is None
+        or row[1].date()
+        != datetime.strptime(lastUpdated_date, "%Y-%m-%d")
+        .replace(tzinfo=timezone.utc)
+        .date()
+    ):  # if more recent file then nuke the path
         doZip = True
         doPGLoad = True
         if os.path.exists(download_path):
@@ -82,7 +98,7 @@ def main():
                 print("Directory doesn't exist:", zip_path)
             print("Creating zip path:", zip_path)
             os.makedirs(zip_path, exist_ok=True)
-            with zipfile.ZipFile(download_file, 'r') as zip_ref:
+            with zipfile.ZipFile(download_file, "r") as zip_ref:
                 zip_ref.extractall(zip_path)
                 print("Extracted zip file to:", zip_path)
         except Exception as e:  # noqa: BLE001 -- deliberately broad: any failure here must
@@ -96,14 +112,20 @@ def main():
         print("Zip extraction skipped as doZip is set to False.")
 
     if doPGLoad:
-        conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
+        conn = psycopg2.connect(
+            host=db_host,
+            port=db_port,
+            dbname=db_name,
+            user=db_user,
+            password=db_password,
+        )
         cursor = conn.cursor()
         all_succeeded = True
         errors = []
 
         for year_month in months:
             print("Loading data for month:", year_month)
-            y, m = map(int, year_month.split('-'))
+            y, m = map(int, year_month.split("-"))
             files = load_month(y, m)
             if files is None:
                 continue
@@ -131,16 +153,21 @@ def main():
 
         if all_succeeded:
             shutil.rmtree(download_path)
-            print("All months loaded successfully — checklog recorded success, downloads cleaned up.")
+            print(
+                "All months loaded successfully — checklog recorded success, downloads cleaned up."
+            )
         else:
-            print("At least one month failed — checklog recorded failure, downloads kept for retry.")
+            print(
+                "At least one month failed — checklog recorded failure, downloads kept for retry."
+            )
 
     else:
         print("PostgreSQL load skipped as doPGLoad is set to False.")
 
 
 def blank_to_none(value):
-    return value if value != '' else None
+    return value if value != "" else None
+
 
 def write_checklog(status, last_updated, error_message=None):
     """Write one row to checklog for this run -- 'success' or 'failure',
@@ -148,20 +175,24 @@ def write_checklog(status, last_updated, error_message=None):
     and the per-month DB load step, so every stage of the pipeline reports
     the same way. `last_updated` is passed in explicitly rather than read
     from a global, since lastUpdated_date now lives inside main()."""
-    log_conn = psycopg2.connect(host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password)
+    log_conn = psycopg2.connect(
+        host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password
+    )
     log_cursor = log_conn.cursor()
     log_cursor.execute(
         "INSERT INTO checklog (crime_last_updated, status, error_message) VALUES (%s, %s, %s)",
-        (last_updated, status, error_message)
+        (last_updated, status, error_message),
     )
     log_conn.commit()
     log_cursor.close()
     log_conn.close()
 
+
 def fnc_download(dlpath, last_updated):
     """Download the latest.zip file from the UK Police Data API."""
-    response = requests.get("https://data.police.uk/data/archive/latest.zip",
-                             stream=True, timeout=300)
+    response = requests.get(
+        "https://data.police.uk/data/archive/latest.zip", stream=True, timeout=300
+    )
     try:
         response.raise_for_status()
     except requests.exceptions.HTTPError as e:
@@ -173,6 +204,7 @@ def fnc_download(dlpath, last_updated):
         f.writelines(response.iter_content(chunk_size=8192))
     return 0
 
+
 def fncdownload_file(lastUpdated_date):
 
     if os.path.exists(download_path):
@@ -183,10 +215,18 @@ def fncdownload_file(lastUpdated_date):
 
     if os.path.exists(download_file):
         print("Download file exists:", download_file)
-        if datetime.fromtimestamp(os.stat(download_file).st_mtime, tz=timezone.utc).date() == datetime.now(tz=timezone.utc).date():
+        if (
+            datetime.fromtimestamp(
+                os.stat(download_file).st_mtime, tz=timezone.utc
+            ).date()
+            == datetime.now(tz=timezone.utc).date()
+        ):
             print("File already downloaded today:", download_file)
         else:
-            print("File exists but not downloaded today, downloading again:", download_file)
+            print(
+                "File exists but not downloaded today, downloading again:",
+                download_file,
+            )
             FN_RESULT = fnc_download(download_file, lastUpdated_date)
             if FN_RESULT != 0:
                 print("File download failed:", download_file)
@@ -202,6 +242,7 @@ def fncdownload_file(lastUpdated_date):
 
     print("Download section complete at:", datetime.now(tz=timezone.utc))
     return 0
+
 
 def load_month(year, month):
     """Find the street/outcomes/stop-and-search files for a specific year and month.
@@ -241,17 +282,29 @@ def load_street_to_db(year_month, street_files, cursor):
     )
 
     for each in street_files:
-        with open(each, 'r') as f:
-            reader = csv.DictReader(f, delimiter=',')
+        with open(each, "r") as f:
+            reader = csv.DictReader(f, delimiter=",")
             rows = [
-                (blank_to_none(row['Crime ID']), blank_to_none(row['Month']), blank_to_none(row['Reported by']),
-                 blank_to_none(row['Falls within']), blank_to_none(row['Longitude']), blank_to_none(row['Latitude']),
-                 blank_to_none(row['Location']), blank_to_none(row['LSOA code']), blank_to_none(row['LSOA name']),
-                 blank_to_none(row['Crime type']), blank_to_none(row['Last outcome category']), blank_to_none(row['Context']))
+                (
+                    blank_to_none(row["Crime ID"]),
+                    blank_to_none(row["Month"]),
+                    blank_to_none(row["Reported by"]),
+                    blank_to_none(row["Falls within"]),
+                    blank_to_none(row["Longitude"]),
+                    blank_to_none(row["Latitude"]),
+                    blank_to_none(row["Location"]),
+                    blank_to_none(row["LSOA code"]),
+                    blank_to_none(row["LSOA name"]),
+                    blank_to_none(row["Crime type"]),
+                    blank_to_none(row["Last outcome category"]),
+                    blank_to_none(row["Context"]),
+                )
                 for row in reader
             ]
         if rows:
             execute_values(cursor, insert_sql, rows, page_size=5000)
+
+
 def load_outcomes_to_db(year_month, outcome_files, cursor):
     """Delete existing raw_outcomes rows for this month, then insert fresh rows
     from every force's street CSV for that month, in one batched call per
@@ -265,17 +318,26 @@ def load_outcomes_to_db(year_month, outcome_files, cursor):
     )
 
     for each in outcome_files:
-        with open(each, 'r') as f:
-            reader = csv.DictReader(f, delimiter=',')
+        with open(each, "r") as f:
+            reader = csv.DictReader(f, delimiter=",")
             rows = [
-                (blank_to_none(row['Crime ID']), blank_to_none(row['Month']), blank_to_none(row['Reported by']),
-                 blank_to_none(row['Falls within']), blank_to_none(row['Longitude']), blank_to_none(row['Latitude']),
-                 blank_to_none(row['Location']), blank_to_none(row['LSOA code']), blank_to_none(row['LSOA name']),
-                 blank_to_none(row['Outcome type']))
+                (
+                    blank_to_none(row["Crime ID"]),
+                    blank_to_none(row["Month"]),
+                    blank_to_none(row["Reported by"]),
+                    blank_to_none(row["Falls within"]),
+                    blank_to_none(row["Longitude"]),
+                    blank_to_none(row["Latitude"]),
+                    blank_to_none(row["Location"]),
+                    blank_to_none(row["LSOA code"]),
+                    blank_to_none(row["LSOA name"]),
+                    blank_to_none(row["Outcome type"]),
+                )
                 for row in reader
             ]
         if rows:
             execute_values(cursor, insert_sql, rows, page_size=5000)
+
 
 def load_search_to_db(year_month, stop_and_search_files, cursor):
     """Delete existing raw_stop_and_search rows for this month, then insert fresh rows
@@ -291,18 +353,32 @@ def load_search_to_db(year_month, stop_and_search_files, cursor):
     )
 
     for each in stop_and_search_files:
-        with open(each, 'r') as f:
-            reader = csv.DictReader(f, delimiter=',')
+        with open(each, "r") as f:
+            reader = csv.DictReader(f, delimiter=",")
             rows = [
-                (year_month, blank_to_none(row['Type']),
-                blank_to_none(row['Date']),blank_to_none(row['Part of a policing operation']),blank_to_none(row['Policing operation']),
-                blank_to_none(row['Latitude']),blank_to_none(row['Longitude']),blank_to_none(row['Gender']),blank_to_none(row['Age range']),
-                blank_to_none(row['Self-defined ethnicity']),blank_to_none(row['Officer-defined ethnicity']),blank_to_none(row['Legislation']),
-                blank_to_none(row['Object of search']),blank_to_none(row['Outcome']),blank_to_none(row['Outcome linked to object of search']),
-                blank_to_none(row['Removal of more than just outer clothing']))
+                (
+                    year_month,
+                    blank_to_none(row["Type"]),
+                    blank_to_none(row["Date"]),
+                    blank_to_none(row["Part of a policing operation"]),
+                    blank_to_none(row["Policing operation"]),
+                    blank_to_none(row["Latitude"]),
+                    blank_to_none(row["Longitude"]),
+                    blank_to_none(row["Gender"]),
+                    blank_to_none(row["Age range"]),
+                    blank_to_none(row["Self-defined ethnicity"]),
+                    blank_to_none(row["Officer-defined ethnicity"]),
+                    blank_to_none(row["Legislation"]),
+                    blank_to_none(row["Object of search"]),
+                    blank_to_none(row["Outcome"]),
+                    blank_to_none(row["Outcome linked to object of search"]),
+                    blank_to_none(row["Removal of more than just outer clothing"]),
+                )
                 for row in reader
             ]
         if rows:
             execute_values(cursor, insert_sql, rows, page_size=5000)
+
+
 if __name__ == "__main__":
     main()

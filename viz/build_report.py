@@ -1,4 +1,5 @@
 """Load report data from the crime marts and render the static HTML report."""
+
 import os
 from datetime import datetime
 from pathlib import Path
@@ -28,8 +29,9 @@ MIN_BASELINE = 20
 
 
 def get_connection():
-    return psycopg2.connect(host=db_host, port=db_port, dbname=db_name,
-                            user=db_user, password=db_password)
+    return psycopg2.connect(
+        host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password
+    )
 
 
 def get_map_data(conn, min_baseline=MIN_BASELINE):
