@@ -8,10 +8,9 @@ import sys
 import zipfile
 from datetime import datetime, timezone
 
-import psycopg2
+import psycopg
 import requests
 from dotenv import load_dotenv
-from psycopg2.extras import execute_values
 
 load_dotenv()
 
@@ -54,7 +53,7 @@ def main():
     months = []
     year, month = now.year, now.month
 
-    conn = psycopg2.connect(
+    conn = psycopg.connect(
         host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password
     )
     cursor = conn.cursor()
@@ -112,7 +111,7 @@ def main():
         print("Zip extraction skipped as doZip is set to False.")
 
     if doPGLoad:
-        conn = psycopg2.connect(
+        conn = psycopg.connect(
             host=db_host,
             port=db_port,
             dbname=db_name,
@@ -169,13 +168,20 @@ def blank_to_none(value):
     return value if value != "" else None
 
 
+def copy_rows(cursor, copy_sql, rows):
+    """Stream rows into a table with COPY, inside the caller's transaction."""
+    with cursor.copy(copy_sql) as copy:
+        for row in rows:
+            copy.write_row(row)
+
+
 def write_checklog(status, last_updated, error_message=None):
     """Write one row to checklog for this run -- 'success' or 'failure',
     with an optional error_message. Used by both the zip-extraction step
     and the per-month DB load step, so every stage of the pipeline reports
     the same way. `last_updated` is passed in explicitly rather than read
     from a global, since lastUpdated_date now lives inside main()."""
-    log_conn = psycopg2.connect(
+    log_conn = psycopg.connect(
         host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password
     )
     log_cursor = log_conn.cursor()
@@ -271,14 +277,14 @@ def load_month(year, month):
 
 def load_street_to_db(year_month, street_files, cursor):
     """Delete existing raw_crimes rows for this month, then insert fresh rows
-    from every force's street CSV for that month, in one batched call per
-    file rather than one execute() per row."""
+    from every force's street CSV for that month, in one COPY per file
+    rather than one execute() per row."""
     cursor.execute("DELETE FROM raw_crimes WHERE month = %s", (year_month,))
 
-    insert_sql = (
-        "INSERT INTO raw_crimes (crime_id, month, reported_by, falls_within, "
+    copy_sql = (
+        "COPY raw_crimes (crime_id, month, reported_by, falls_within, "
         "longitude, latitude, location, lsoa_code, lsoa_name, crime_type, "
-        "last_outcome_category, context) VALUES %s"
+        "last_outcome_category, context) FROM STDIN"
     )
 
     for each in street_files:
@@ -302,19 +308,19 @@ def load_street_to_db(year_month, street_files, cursor):
                 for row in reader
             ]
         if rows:
-            execute_values(cursor, insert_sql, rows, page_size=5000)
+            copy_rows(cursor, copy_sql, rows)
 
 
 def load_outcomes_to_db(year_month, outcome_files, cursor):
     """Delete existing raw_outcomes rows for this month, then insert fresh rows
-    from every force's street CSV for that month, in one batched call per
-    file rather than one execute() per row."""
+    from every force's street CSV for that month, in one COPY per file
+    rather than one execute() per row."""
     cursor.execute("DELETE FROM raw_outcomes WHERE month = %s", (year_month,))
 
-    insert_sql = (
-        "INSERT INTO raw_outcomes (crime_id, month, reported_by, falls_within, "
-        "longitude, latitude, location, lsoa_code, lsoa_name, outcome_type "
-        ") VALUES %s"
+    copy_sql = (
+        "COPY raw_outcomes (crime_id, month, reported_by, falls_within, "
+        "longitude, latitude, location, lsoa_code, lsoa_name, outcome_type) "
+        "FROM STDIN"
     )
 
     for each in outcome_files:
@@ -336,20 +342,20 @@ def load_outcomes_to_db(year_month, outcome_files, cursor):
                 for row in reader
             ]
         if rows:
-            execute_values(cursor, insert_sql, rows, page_size=5000)
+            copy_rows(cursor, copy_sql, rows)
 
 
 def load_search_to_db(year_month, stop_and_search_files, cursor):
     """Delete existing raw_stop_and_search rows for this month, then insert fresh rows
-    from every force's street CSV for that month, in one batched call per
-    file rather than one execute() per row."""
+    from every force's street CSV for that month, in one COPY per file
+    rather than one execute() per row."""
     cursor.execute("DELETE FROM raw_stop_and_search WHERE month = %s", (year_month,))
 
-    insert_sql = (
-        "INSERT INTO raw_stop_and_search (month, type, date, "
+    copy_sql = (
+        "COPY raw_stop_and_search (month, type, date, "
         "part_of_policing_operation, policing_operation, latitude, longitude, gender, age_range, "
         "self_defined_ethnicity, officer_defined_ethnicity, legislation, object_of_search, outcome,"
-        "outcome_linked_to_object_of_search, removal_of_more_than_outer_clothing) VALUES %s"
+        "outcome_linked_to_object_of_search, removal_of_more_than_outer_clothing) FROM STDIN"
     )
 
     for each in stop_and_search_files:
@@ -377,7 +383,7 @@ def load_search_to_db(year_month, stop_and_search_files, cursor):
                 for row in reader
             ]
         if rows:
-            execute_values(cursor, insert_sql, rows, page_size=5000)
+            copy_rows(cursor, copy_sql, rows)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
-import psycopg2
+import psycopg
 from dotenv import load_dotenv
 from jinja2 import Environment, FileSystemLoader
 
@@ -29,7 +29,7 @@ MIN_BASELINE = 20
 
 
 def get_connection():
-    return psycopg2.connect(
+    return psycopg.connect(
         host=db_host, port=db_port, dbname=db_name, user=db_user, password=db_password
     )
 
